@@ -24,7 +24,6 @@ final class McClickSink implements ClickSink {
         return switch (kind) {
             case PICKUP -> ClickType.PICKUP;
             case QUICK_MOVE -> ClickType.QUICK_MOVE;
-            case PICKUP_ALL -> ClickType.PICKUP_ALL;
             case QUICK_CRAFT -> ClickType.QUICK_CRAFT;
         };
     }

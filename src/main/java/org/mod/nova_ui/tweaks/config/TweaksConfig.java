@@ -17,15 +17,20 @@ public final class TweaksConfig {
             .translation(KEY + "enabled")
             .define("enabled", true);
 
-    public static final ForgeConfigSpec.BooleanValue SPREAD_ONE = BUILDER
+    public static final ForgeConfigSpec.BooleanValue RMB_SPREAD = BUILDER
             .comment("ПКМ с предметами на курсоре: по одному предмету в каждый слот / RMB with a cursor stack: one item per slot")
-            .translation(KEY + "spread_one")
-            .define("spreadOne", true);
+            .translation(KEY + "rmb_spread")
+            .define("rmbSpread", true);
 
     public static final ForgeConfigSpec.BooleanValue SPREAD_SPLIT = BUILDER
             .comment("ЛКМ с предметами на курсоре: деление поровну между слотами / LMB with a cursor stack: even split between slots")
             .translation(KEY + "spread_split")
             .define("spreadSplit", true);
+
+    public static final ForgeConfigSpec.BooleanValue LMB_COLLECT = BUILDER
+            .comment("ЛКМ-проведение со стеком, взятым этим же нажатием: собирает такие же предметы (с Shift переносит их) / LMB sweep with a stack picked up by the same press: collects the same items (moves them with Shift)")
+            .translation(KEY + "lmb_collect")
+            .define("lmbCollect", true);
 
     public static final ForgeConfigSpec.BooleanValue SHIFT_DRAG = BUILDER
             .comment("Shift + ЛКМ без предмета на курсоре: перенос каждого слота под курсором / Shift + LMB with an empty cursor: move every slot under the cursor")
@@ -52,15 +57,10 @@ public final class TweaksConfig {
             .translation(KEY + "wheel_step")
             .defineInRange("wheelStep", 1, 1, 64);
 
-    public static final ForgeConfigSpec.BooleanValue DOUBLE_CLICK = BUILDER
-            .comment("Двойной клик собирает предметы в стек, но не из слота результата / Double click collects items into a stack, but not from a result slot")
-            .translation(KEY + "double_click")
-            .define("doubleClick", true);
-
-    public static final ForgeConfigSpec.IntValue DOUBLE_CLICK_MS = BUILDER
-            .comment("Окно двойного клика в миллисекундах / The double click window in milliseconds")
-            .translation(KEY + "double_click_ms")
-            .defineInRange("doubleClickMs", 250, 100, 1000);
+    public static final ForgeConfigSpec.BooleanValue DOUBLE_CLICK_GUARD = BUILDER
+            .comment("Двойной клик не собирает предметы из слота результата / A double click does not collect from a result slot")
+            .translation(KEY + "double_click_guard")
+            .define("doubleClickGuard", true);
 
     public static final ForgeConfigSpec.BooleanValue CONTAINERS_ONLY = BUILDER
             .comment("Только контейнеры: не работать в собственном инвентаре игрока / Containers only: do not work in the player's own inventory")
@@ -90,14 +90,14 @@ public final class TweaksConfig {
     }
 
     private static final class Settings implements TweakSettings {
-        @Override public boolean spreadOneEnabled() { return ENABLED.get() && SPREAD_ONE.get(); }
+        @Override public boolean rmbSpreadEnabled() { return ENABLED.get() && RMB_SPREAD.get(); }
         @Override public boolean spreadSplitEnabled() { return ENABLED.get() && SPREAD_SPLIT.get(); }
+        @Override public boolean lmbCollectEnabled() { return ENABLED.get() && LMB_COLLECT.get(); }
         @Override public boolean shiftDragEnabled() { return ENABLED.get() && SHIFT_DRAG.get(); }
         @Override public boolean shiftDragIncludesTakeOnly() { return SHIFT_DRAG_RESULTS.get(); }
         @Override public boolean wheelEnabled() { return ENABLED.get() && WHEEL.get(); }
         @Override public WheelDirection wheelDirection() { return WHEEL_DIRECTION.get(); }
         @Override public int wheelStep() { return WHEEL_STEP.get(); }
-        @Override public boolean doubleClickEnabled() { return ENABLED.get() && DOUBLE_CLICK.get(); }
-        @Override public int doubleClickWindowMillis() { return DOUBLE_CLICK_MS.get(); }
+        @Override public boolean doubleClickGuardEnabled() { return ENABLED.get() && DOUBLE_CLICK_GUARD.get(); }
     }
 }

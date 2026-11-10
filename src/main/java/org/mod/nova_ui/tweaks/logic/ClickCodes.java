@@ -11,7 +11,6 @@ public final class ClickCodes {
     public static final int STAGE_ADD = 1;
     public static final int STAGE_END = 2;
     public static final int DRAG_SPLIT = 0;
-    public static final int DRAG_ONE = 1;
 
     private ClickCodes() {}
 

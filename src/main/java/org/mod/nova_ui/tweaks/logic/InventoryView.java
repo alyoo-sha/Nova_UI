@@ -13,4 +13,7 @@ public interface InventoryView {
     Object carriedKey();
 
     int carriedCount();
+
+    // Максимальный размер стека предмета на курсоре / The maximum stack size of the cursor item
+    int carriedMaxStack();
 }

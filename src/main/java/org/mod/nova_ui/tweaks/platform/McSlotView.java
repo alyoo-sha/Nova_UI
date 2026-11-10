@@ -83,4 +83,14 @@ final class McSlotView implements SlotView {
         ItemStack current = slot.getItem();
         return current.isEmpty() || ItemStack.isSameItemSameTags(current, probe);
     }
+
+    // Решение принимает само меню: ровно та проверка, по которой ванильный двойной клик выбирает слоты
+    // The menu itself decides: exactly the check by which the vanilla double click picks slots
+    @Override
+    public boolean pickupAllWouldTake(Object itemKey) {
+        ItemStack stack = slot.getItem();
+        if (stack.isEmpty() || !isTakeOnly()) return false;
+        ItemStack probe = ((McItemKey) itemKey).probe();
+        return ItemStack.isSameItemSameTags(stack, probe) && slot.mayPickup(player) && menu.canTakeItemForPickAll(probe, slot);
+    }
 }

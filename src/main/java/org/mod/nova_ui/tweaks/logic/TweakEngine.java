@@ -42,11 +42,9 @@ public final class TweakEngine {
         gestures.resetAll();
     }
 
-    public boolean isSplitting() {
-        return gestures.isSplitting();
-    }
-
-    public List<Integer> splitSlotIds() {
-        return gestures.collectedSlotIds();
+    // Слоты, которые нужно подсветить (деление поровну в процессе); пусто, если подсвечивать нечего
+    // Slots to highlight (an even split in progress); empty if there is nothing to highlight
+    public List<Integer> highlightedSlotIds() {
+        return gestures.highlightedSlotIds();
     }
 }

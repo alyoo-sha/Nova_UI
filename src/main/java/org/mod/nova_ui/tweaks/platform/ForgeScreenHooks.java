@@ -12,11 +12,14 @@ import net.minecraftforge.fml.common.Mod;
 import org.mod.nova_core.ui.minecraft.container.NovaContainerScreen;
 import org.mod.nova_ui.Nova_ui;
 
+import java.util.List;
+
 // События Forge для окон, не подменённых Nova (в том числе чужих модов); окна Nova идут через точку расширения
 // Forge events for windows not replaced by Nova (including other mods); Nova windows go through the extension point
 @Mod.EventBusSubscriber(modid = Nova_ui.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
 public final class ForgeScreenHooks {
-    // Подсветка слотов деления поровну (ARGB) / Highlight of the even-split slots (ARGB)
+    // Подсветка слотов деления поровну в чужих окнах (ARGB); окна Nova рисуют её цветом темы
+    // The even-split highlight in foreign windows (ARGB); Nova windows draw it in the theme color
     private static final int SPLIT_HIGHLIGHT = 0x60FFFFFF;
 
     private ForgeScreenHooks() {}
@@ -54,23 +57,26 @@ public final class ForgeScreenHooks {
         if (TweaksRuntime.release(screen, event.getButton())) event.setCanceled(true);
     }
 
+    // Post приходит, только если экран сам не обработал прокрутку: окна со своей прокруткой не ломаются
+    // Post arrives only if the screen did not handle the scroll itself: windows with their own scrolling are not broken
     @SubscribeEvent
-    public static void onScroll(ScreenEvent.MouseScrolled.Pre event) {
+    public static void onScroll(ScreenEvent.MouseScrolled.Post event) {
         AbstractContainerScreen<?> screen = target(event.getScreen());
         if (screen == null) return;
         Slot slot = TweaksRuntime.slotAt(screen, event.getMouseX(), event.getMouseY());
-        if (TweaksRuntime.scroll(screen, slot, event.getScrollDelta())) event.setCanceled(true);
+        TweaksRuntime.scroll(screen, slot, event.getScrollDelta());
     }
 
-    // Подсветка слотов, выбранных для деления поровну: ванильный предпросмотр при этом жесте отключён
-    // Highlights the slots picked for the even split: the vanilla preview is off during this gesture
     @SubscribeEvent
     public static void onRender(ScreenEvent.Render.Post event) {
-        if (!TweaksRuntime.isSplitting() || !(event.getScreen() instanceof AbstractContainerScreen<?> screen)) return;
+        AbstractContainerScreen<?> screen = target(event.getScreen());
+        if (screen == null) return;
+        List<Integer> ids = TweaksRuntime.highlightedSlotIds();
+        if (ids.isEmpty()) return;
         GuiGraphics g = event.getGuiGraphics();
         g.pose().pushPose();
         g.pose().translate(0.0F, 0.0F, 300.0F); // над предметами / above the items
-        for (int id : TweaksRuntime.splitSlotIds()) {
+        for (int id : ids) {
             if (id < 0 || id >= screen.getMenu().slots.size()) continue;
             Slot slot = screen.getMenu().slots.get(id);
             int x = screen.getGuiLeft() + slot.x;

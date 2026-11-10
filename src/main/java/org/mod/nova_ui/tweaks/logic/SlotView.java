@@ -30,4 +30,8 @@ public interface SlotView {
     // Можно ли включить слот в раскладку перетаскиванием: пуст или тот же предмет, и слот разрешает
     // Whether the slot can join a drag distribution: empty or the same item, and the slot allows it
     boolean acceptsSpread(Object itemKey);
+
+    // Забрало бы ванильное «собрать в стек» предмет из этого слота (результат с таким же предметом)
+    // Whether the vanilla "collect into a stack" would take an item from this slot (a result holding the same item)
+    boolean pickupAllWouldTake(Object itemKey);
 }

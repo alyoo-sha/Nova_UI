@@ -80,12 +80,9 @@ public final class TweaksRuntime {
         view = null;
     }
 
-    public static boolean isSplitting() {
-        return ENGINE.isSplitting();
-    }
-
-    public static List<Integer> splitSlotIds() {
-        return ENGINE.splitSlotIds();
+    // Слоты, которые нужно подсветить сейчас / Slots to highlight right now
+    public static List<Integer> highlightedSlotIds() {
+        return ENGINE.highlightedSlotIds();
     }
 
     private static McInventoryView viewFor(AbstractContainerScreen<?> screen) {

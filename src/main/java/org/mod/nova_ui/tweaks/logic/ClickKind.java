@@ -5,6 +5,5 @@ package org.mod.nova_ui.tweaks.logic;
 public enum ClickKind {
     PICKUP,
     QUICK_MOVE,
-    PICKUP_ALL,
     QUICK_CRAFT
 }

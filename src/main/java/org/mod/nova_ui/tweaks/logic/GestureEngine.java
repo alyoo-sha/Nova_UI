@@ -6,12 +6,17 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-// Жесты с зажатой кнопкой и двойной клик: раскладка по одному (ПКМ), деление поровну (ЛКМ),
-// перенос Shift-проведением, сбор в стек. Возврат true означает «событие поглощено»
-// Held-button gestures and the double click: one-per-slot (RMB), even split (LMB),
-// Shift-sweep move, stack collection. Returning true means "event consumed"
+// Жесты с зажатой кнопкой и защита двойного клика: раскладка по одному (ПКМ), деление поровну (ЛКМ),
+// проведение с пустым курсором (сбор и Shift-перенос). Возврат true означает «событие поглощено»
+// Held-button gestures and the double-click guard: one-per-slot (RMB), even split (LMB),
+// the sweep with an empty cursor (collect and Shift move). Returning true means "event consumed"
 public final class GestureEngine {
-    private enum Mode { NONE, SPREAD_ONE, SPREAD_SPLIT, SHIFT_DRAG, SWALLOW }
+    private enum Mode { NONE, RMB_SPREAD, LMB_SPLIT, LMB_DRAG, SWALLOW }
+
+    private static final List<Integer> NO_SLOTS = List.of();
+    // Окно двойного клика как в ванили; должно совпадать, иначе мы и ваниль по-разному поймём «двойной»
+    // The double click window as in vanilla; it must match, otherwise we and vanilla would disagree on what "double" is
+    private static final long DOUBLE_CLICK_MS = 250L;
 
     private final TweakSettings settings;
     private final ClickSink sink;
@@ -23,7 +28,7 @@ public final class GestureEngine {
     private Object startKey = null;
     // Слоты, уже обработанные за жест / Slots already handled during the gesture
     private final Set<Integer> visited = new HashSet<>();
-    // Слоты раскладки поровну / Slots of the even split
+    // Слоты деления поровну / Slots of the even split
     private final List<Integer> collected = new ArrayList<>();
     private final List<Integer> collectedView = Collections.unmodifiableList(collected);
 
@@ -36,13 +41,9 @@ public final class GestureEngine {
         this.budget = budget;
     }
 
-    // Слоты, выбранные для деления поровну; нужны для подсветки / Slots picked for the even split; used for highlighting
-    public List<Integer> collectedSlotIds() {
-        return collectedView;
-    }
-
-    public boolean isSplitting() {
-        return mode == Mode.SPREAD_SPLIT;
+    // Слоты для подсветки: пока идёт деление и выбрано хотя бы два слота (как в ванили) / Slots to highlight: while a split is in progress and at least two slots are picked (as in vanilla)
+    public List<Integer> highlightedSlotIds() {
+        return mode == Mode.LMB_SPLIT && collected.size() >= 2 ? collectedView : NO_SLOTS;
     }
 
     // Сбрасывает жест, но помнит последний клик для двойного / Resets the gesture but remembers the last click for the double click
@@ -61,6 +62,7 @@ public final class GestureEngine {
         lastLeftTime = 0L;
     }
 
+    // true: нажатие поглощено / true: the press is consumed
     public boolean press(InventoryView view, SlotView slot, int pressed, boolean shift, long nowMs) {
         reset();
         if (slot == null) {
@@ -69,97 +71,95 @@ public final class GestureEngine {
         }
         long dt = nowMs - lastLeftTime;
         boolean doubleClick = pressed == ClickCodes.LEFT && !shift && slot.id() == lastLeftSlot
-                && dt >= 0L && dt <= settings.doubleClickWindowMillis();
+                && dt >= 0L && dt < DOUBLE_CLICK_MS;
         if (pressed == ClickCodes.LEFT) {
             lastLeftSlot = slot.id();
             lastLeftTime = nowMs;
         }
 
         Object carried = view.carriedKey();
-        if (carried != null) {
-            if (shift) return false;
-            if (doubleClick && settings.doubleClickEnabled()) {
-                lastLeftSlot = -1;
-                // Нажатие поглощено, значит и отпускание тоже: иначе ваниль выполнит свой клик
-                // The press is consumed, so the release is consumed too: otherwise vanilla performs its own click
-                begin(Mode.SWALLOW, slot, null, ClickCodes.LEFT);
-                collectStack(view, slot, carried);
-                return true;
+        if (pressed == ClickCodes.LEFT) {
+            if (carried != null) {
+                if (shift) return false;
+                // Ванильный двойной клик собирает стек сам; мы лишь не даём собрать из результата
+                // The vanilla double click collects the stack itself; we only stop collecting from a result
+                if (doubleClick) {
+                    if (settings.doubleClickGuardEnabled() && wouldCollectFromResult(view, carried)) {
+                        lastLeftSlot = -1;
+                        begin(Mode.SWALLOW, slot, null, ClickCodes.LEFT);
+                        return true;
+                    }
+                    return false;
+                }
+                if (settings.spreadSplitEnabled()) {
+                    begin(Mode.LMB_SPLIT, slot, carried, ClickCodes.LEFT);
+                    if (slot.acceptsSpread(carried)) collected.add(slot.id());
+                    return true;
+                }
+                return false;
             }
-            if (pressed == ClickCodes.RIGHT && settings.spreadOneEnabled()) return beginSpreadOne(slot, carried);
-            if (pressed == ClickCodes.LEFT && settings.spreadSplitEnabled()) return beginSpreadSplit(slot, carried);
+            // Курсор пуст: ваниль возьмёт стек этим нажатием, мы запоминаем начало жеста
+            // The cursor is empty: vanilla picks the stack up with this press, we remember the start of the gesture
+            if (settings.lmbCollectEnabled() || settings.shiftDragEnabled()) begin(Mode.LMB_DRAG, slot, null, ClickCodes.LEFT);
             return false;
         }
-        if (shift && pressed == ClickCodes.LEFT && settings.shiftDragEnabled()) {
-            // Первый слот обработает ванильный Shift+клик, мы лишь запоминаем его / Vanilla Shift+click handles the first slot, we only remember it
-            begin(Mode.SHIFT_DRAG, slot, null, ClickCodes.LEFT);
+
+        if (pressed == ClickCodes.RIGHT && carried != null && settings.rmbSpreadEnabled()) {
+            begin(Mode.RMB_SPREAD, slot, carried, ClickCodes.RIGHT);
+            // Первый слот: обычный правый клик, как в ванили / The first slot: an ordinary right click, as in vanilla
+            send(slot.id(), ClickCodes.RIGHT, ClickKind.PICKUP);
+            return true;
         }
         return false;
     }
 
+    // Перетаскивание никогда не поглощаем: ванильное перетаскивание в наших режимах ничего не делает
+    // A drag is never consumed: the vanilla drag does nothing in our modes
     public boolean drag(InventoryView view, SlotView slot, int dragged, boolean shift) {
         if (mode == Mode.NONE || dragged != button) return false;
-        return switch (mode) {
-            case SPREAD_ONE -> dragSpreadOne(view, slot);
-            case SPREAD_SPLIT -> dragSpreadSplit(view, slot);
-            case SHIFT_DRAG -> dragShift(view, slot, shift);
-            case SWALLOW -> true;
-            default -> false;
-        };
+        if (mode == Mode.RMB_SPREAD) dragRmb(view, slot);
+        else if (mode == Mode.LMB_SPLIT) dragSplit(view, slot);
+        else if (mode == Mode.LMB_DRAG) dragLeft(view, slot, shift);
+        return false;
     }
 
+    // true: отпускание поглощено / true: the release is consumed
     public boolean release(InventoryView view, int released) {
         if (mode == Mode.NONE || released != button) return false;
         Mode finished = mode;
-        if (finished == Mode.SPREAD_SPLIT) finishSplit(view);
+        if (finished == Mode.LMB_SPLIT) finishSplit(view);
         reset();
-        // Нажатие Shift-проведения обработала ваниль, значит и отпускание её / Vanilla handled the Shift-sweep press, so it handles the release too
-        return finished != Mode.SHIFT_DRAG;
+        // Нажатие ЛКМ-проведения с пустым курсором обработала ваниль, значит и отпускание её
+        // Vanilla handled the press of the empty-cursor sweep, so it handles the release too
+        return finished != Mode.LMB_DRAG;
     }
 
     // ---------- ПКМ: по одному предмету в каждый слот / RMB: one item per slot ----------
 
-    private boolean beginSpreadOne(SlotView slot, Object carried) {
-        begin(Mode.SPREAD_ONE, slot, carried, ClickCodes.RIGHT);
-        // Первый слот: обычный правый клик, как в ванили / The first slot: an ordinary right click, as in vanilla
-        send(slot.id(), ClickCodes.RIGHT, ClickKind.PICKUP);
-        return true;
-    }
-
-    private boolean dragSpreadOne(InventoryView view, SlotView slot) {
+    private void dragRmb(InventoryView view, SlotView slot) {
         if (!sameCarried(view)) {
             swallow();
-            return true;
+            return;
         }
-        if (slot == null || visited.contains(slot.id())) return true;
-        if (slot.roomFor(startKey) > 0) {
-            if (!send(slot.id(), ClickCodes.RIGHT, ClickKind.PICKUP)) return true; // лимит: повторим на следующем событии / limit: retry on the next event
-        }
+        if (slot == null || visited.contains(slot.id())) return;
+        if (slot.roomFor(startKey) > 0 && !send(slot.id(), ClickCodes.RIGHT, ClickKind.PICKUP)) return; // лимит: повторим позже / limit: retry later
         visited.add(slot.id());
-        return true;
     }
 
     // ---------- ЛКМ: деление поровну / LMB: even split ----------
 
-    private boolean beginSpreadSplit(SlotView slot, Object carried) {
-        begin(Mode.SPREAD_SPLIT, slot, carried, ClickCodes.LEFT);
-        if (slot.acceptsSpread(carried)) collected.add(slot.id());
-        return true;
-    }
-
-    private boolean dragSpreadSplit(InventoryView view, SlotView slot) {
+    private void dragSplit(InventoryView view, SlotView slot) {
         if (!sameCarried(view)) {
             swallow();
-            return true;
+            return;
         }
-        if (slot == null) return true;
+        if (slot == null) return;
         visited.add(slot.id());
         // Каждому слоту нужен хотя бы один предмет, поэтому слотов не больше, чем предметов в руке
         // Every slot needs at least one item, so there are no more slots than items in hand
         if (collected.size() < view.carriedCount() && !collected.contains(slot.id()) && slot.acceptsSpread(startKey)) {
             collected.add(slot.id());
         }
-        return true;
     }
 
     private void finishSplit(InventoryView view) {
@@ -181,30 +181,62 @@ public final class GestureEngine {
         }
     }
 
-    // ---------- Shift + ЛКМ: перенос проведением / Shift + LMB: sweep move ----------
+    // ---------- ЛКМ-проведение с пустым курсором в начале / LMB sweep that started with an empty cursor ----------
 
-    private boolean dragShift(InventoryView view, SlotView slot, boolean shift) {
-        if (view.carriedKey() != null || !shift) {
-            reset();
-            return false;
+    private void dragLeft(InventoryView view, SlotView slot, boolean shift) {
+        if (slot == null || visited.contains(slot.id())) return;
+        if (slot.isEmpty()) {
+            visited.add(slot.id());
+            return;
         }
-        if (slot == null || visited.contains(slot.id())) return true;
-        boolean movable = !slot.isEmpty() && slot.canPickup()
-                && (!slot.isTakeOnly() || settings.shiftDragIncludesTakeOnly());
-        if (movable && !send(slot.id(), ClickCodes.LEFT, ClickKind.QUICK_MOVE)) return true;
-        visited.add(slot.id());
-        return true;
+        Object carried = view.carriedKey();
+        if (carried == null) {
+            // Shift + ЛКМ без предмета: Shift-клик по каждому слоту / Shift + LMB without an item: a Shift click on every slot
+            if (!settings.shiftDragEnabled() || !shift) return;
+            shiftMove(slot);
+            return;
+        }
+        if (!settings.lmbCollectEnabled() || !carried.equals(slot.itemKey())) {
+            visited.add(slot.id());
+            return;
+        }
+        if (shift) {
+            shiftMove(slot);
+        } else {
+            collectInto(view, slot, carried);
+        }
     }
 
-    // ---------- Двойной клик: сбор в стек / Double click: collect into a stack ----------
+    private void shiftMove(SlotView slot) {
+        boolean movable = slot.canPickup() && (!slot.isTakeOnly() || settings.shiftDragIncludesTakeOnly());
+        if (movable && !send(slot.id(), ClickCodes.LEFT, ClickKind.QUICK_MOVE)) return;
+        visited.add(slot.id());
+    }
 
-    private void collectStack(InventoryView view, SlotView slot, Object carried) {
-        // Если подходящий предмет лежит в слоте результата, сбор мог бы забрать его оттуда: не отправляем ничего
-        // If a matching item sits in a result slot, the collection could take it from there: send nothing
-        for (SlotView s : view.slots()) {
-            if (s.isTakeOnly() && !s.isEmpty() && carried.equals(s.itemKey())) return;
+    // Сливаем стек с курсора в слот и берём обратно: на курсоре оказывается сумма. Только если сумма помещается в стек
+    // Merge the cursor stack into the slot and pick it up again: the cursor ends up with the sum. Only if the sum fits a stack
+    private void collectInto(InventoryView view, SlotView slot, Object carried) {
+        boolean fits = !slot.isTakeOnly()
+                && view.carriedCount() + slot.count() <= view.carriedMaxStack()
+                && slot.roomFor(carried) >= view.carriedCount();
+        if (fits) {
+            if (!budget.canSend(2)) return;
+            sink.click(slot.id(), ClickCodes.LEFT, ClickKind.PICKUP);
+            sink.click(slot.id(), ClickCodes.LEFT, ClickKind.PICKUP);
+            budget.spend(2);
         }
-        send(slot.id(), ClickCodes.LEFT, ClickKind.PICKUP_ALL);
+        visited.add(slot.id());
+    }
+
+    // ---------- Двойной клик / Double click ----------
+
+    // Забрал бы ванильный сбор в стек предмет из результата: тогда поглощаем клик целиком
+    // Whether the vanilla collection would take an item from a result: then the whole click is consumed
+    private boolean wouldCollectFromResult(InventoryView view, Object carried) {
+        for (SlotView s : view.slots()) {
+            if (s.pickupAllWouldTake(carried)) return true;
+        }
+        return false;
     }
 
     // ---------- Служебное / Helpers ----------

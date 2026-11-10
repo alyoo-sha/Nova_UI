@@ -6,6 +6,7 @@ import org.mod.nova_core.ui.minecraft.container.interaction.InventoryInteraction
 import org.mod.nova_core.ui.minecraft.container.interaction.InventoryMouseEvent;
 
 import javax.annotation.Nullable;
+import java.util.Collection;
 
 // Подключение к точке расширения Nova Core: окна на базе NovaContainerScreen
 // The hookup to the Nova Core extension point: windows based on NovaContainerScreen
@@ -34,5 +35,10 @@ public final class NovaTweaksInteraction implements InventoryInteraction {
     @Override
     public boolean onSlotScroll(AbstractContainerScreen<?> screen, @Nullable Slot slot, InventoryMouseEvent event) {
         return TweaksRuntime.scroll(screen, slot, event.scrollDelta());
+    }
+
+    @Override
+    public Collection<Integer> highlightedSlots(AbstractContainerScreen<?> screen) {
+        return TweaksRuntime.highlightedSlotIds();
     }
 }

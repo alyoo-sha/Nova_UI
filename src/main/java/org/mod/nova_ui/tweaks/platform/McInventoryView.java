@@ -54,4 +54,9 @@ final class McInventoryView implements InventoryView {
     public int carriedCount() {
         return menu.getCarried().getCount();
     }
+
+    @Override
+    public int carriedMaxStack() {
+        return menu.getCarried().getMaxStackSize();
+    }
 }
