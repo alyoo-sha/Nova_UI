@@ -17,9 +17,10 @@ public class Nova_ui {
 
     public static final String MOD_ID = "nova_ui";
     private static final Logger LOGGER = LogUtils.getLogger();
+    public static IEventBus modEventBus;
 
-    public Nova_ui() {
-        IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
+    public Nova_ui(FMLJavaModLoadingContext context) {
+        modEventBus = context.getModEventBus();
 
 
         NovaCoreMenus.init();
