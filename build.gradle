@@ -1,16 +1,16 @@
-evaluationDependsOn(':Nova_Core')
+evaluationDependsOn(':Nova-Core')
 
 apply from: rootProject.file('gradle/nova-module.gradle')
 
 dependencies {
-  compileOnly project(':Nova_Core').sourceSets.main.output
+  compileOnly project(':Nova-Core').sourceSets.main.output
 }
 
 minecraft {
   runs {
     configureEach {
       mods {
-        nova_core { source project(':Nova_Core').sourceSets.main }
+        nova_core { source project(':Nova-Core').sourceSets.main }
       }
     }
   }
