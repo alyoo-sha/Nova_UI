@@ -1,0 +1,14 @@
+{
+  "nova_ui.tweaks.config.enabled": "Твики инвентаря",
+  "nova_ui.tweaks.config.spread_one": "ПКМ-проведение: по одному предмету в слот",
+  "nova_ui.tweaks.config.spread_split": "ЛКМ-проведение: деление поровну",
+  "nova_ui.tweaks.config.shift_drag": "Shift + ЛКМ-проведение: перенос слотов",
+  "nova_ui.tweaks.config.shift_drag_results": "Shift-проведение переносит и слоты результата",
+  "nova_ui.tweaks.config.wheel": "Колесо переносит предметы",
+  "nova_ui.tweaks.config.wheel_direction": "Направление колеса",
+  "nova_ui.tweaks.config.wheel_step": "Предметов за щелчок колеса",
+  "nova_ui.tweaks.config.double_click": "Двойной клик собирает стек",
+  "nova_ui.tweaks.config.double_click_ms": "Окно двойного клика (мс)",
+  "nova_ui.tweaks.config.containers_only": "Только контейнеры",
+  "nova_ui.tweaks.config.excluded_screens": "Исключённые экраны"
+}
